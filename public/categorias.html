@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Categorías · Farmacia</title><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<nav id="navbar"></nav>
+<main>
+  <h1>Categorías</h1>
+  <div id="alert" class="alert"></div>
+  <form id="form" class="card" novalidate>
+    <h2 id="formTitulo">Nueva categoría</h2>
+    <input type="hidden" name="id">
+    <div class="grid">
+      <div><label for="nombre">Nombre</label><input id="nombre" name="nombre"><div class="error" data-error="nombre"></div></div>
+      <div><label for="descripcion">Descripción</label><input id="descripcion" name="descripcion"><div class="error" data-error="descripcion"></div></div>
+    </div>
+    <button class="btn" type="submit">Guardar</button>
+    <button class="btn sec" type="button" id="cancelar">Cancelar</button>
+  </form>
+  <div class="wrap"><table>
+    <thead><tr><th>ID</th><th>Nombre</th><th>Descripción</th><th>Medicamentos</th><th>Acciones</th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table></div>
+</main>
+<script src="/js/app.js"></script>
+<script>
+const u = requireAuth(['administrador', 'moderador']); renderNavbar();
+const puedeEliminar = u.rol === 'administrador';
+const form = document.getElementById('form');
+let items = [];
+
+async function cargar() {
+  try { items = await api('/categorias'); render(); } catch (e) { showAlert(e.message); }
+}
+function render() {
+  document.getElementById('filas').innerHTML = items.map((c) => `<tr>
+    <td>${c.id}</td><td>${esc(c.nombre)}</td><td>${esc(c.descripcion)}</td><td>${c.totalMedicamentos}</td>
+    <td><button class="btn sm sec" data-edit="${c.id}">Editar</button>
+    ${puedeEliminar ? `<button class="btn sm del" data-del="${c.id}">Eliminar</button>` : ''}</td></tr>`).join('')
+    || '<tr><td colspan="5">No hay categorías registradas.</td></tr>';
+}
+function limpiar() { form.reset(); form.id.value = ''; clearErrors(form); document.getElementById('formTitulo').textContent = 'Nueva categoría'; }
+document.getElementById('cancelar').addEventListener('click', limpiar);
+
+document.getElementById('filas').addEventListener('click', async (e) => {
+  const edit = e.target.dataset.edit, del = e.target.dataset.del;
+  if (edit) {
+    const c = items.find((x) => x.id == edit);
+    form.id.value = c.id; form.nombre.value = c.nombre; form.descripcion.value = c.descripcion || '';
+    document.getElementById('formTitulo').textContent = 'Editar categoría';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  if (del && confirm('¿Eliminar esta categoría?')) {
+    try { await api('/categorias/' + del, { method: 'DELETE' }); showAlert('Categoría eliminada', 'ok'); cargar(); }
+    catch (err) { showAlert(err.message); }
+  }
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault(); clearErrors(form);
+  const nombre = form.nombre.value.trim(), descripcion = form.descripcion.value.trim();
+  let ok = true;
+  if (nombre.length < 3) { fieldError(form, 'nombre', 'Mínimo 3 caracteres'); ok = false; }
+  if (descripcion.length > 255) { fieldError(form, 'descripcion', 'Máximo 255 caracteres'); ok = false; }
+  if (!ok) return;
+  const id = form.id.value;
+  try {
+    await api(id ? '/categorias/' + id : '/categorias', { method: id ? 'PUT' : 'POST', body: { nombre, descripcion } });
+    showAlert(id ? 'Categoría actualizada' : 'Categoría creada', 'ok');
+    limpiar(); cargar();
+  } catch (err) { showAlert(err.message); }
+});
+cargar();
+</script>
+</body></html>

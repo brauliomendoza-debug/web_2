@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medicamentos · Farmacia</title><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<nav id="navbar"></nav>
+<main>
+  <h1>Medicamentos</h1>
+  <div id="alert" class="alert"></div>
+  <form id="form" class="card" novalidate hidden>
+    <h2 id="formTitulo">Nuevo medicamento</h2>
+    <input type="hidden" name="id">
+    <div class="grid">
+      <div><label for="nombre">Nombre</label><input id="nombre" name="nombre"><div class="error" data-error="nombre"></div></div>
+      <div><label for="laboratorio">Laboratorio</label><input id="laboratorio" name="laboratorio"><div class="error" data-error="laboratorio"></div></div>
+      <div><label for="precio">Precio</label><input id="precio" name="precio" type="number" step="0.01" min="0"><div class="error" data-error="precio"></div></div>
+      <div><label for="stock">Stock</label><input id="stock" name="stock" type="number" step="1" min="0"><div class="error" data-error="stock"></div></div>
+      <div><label for="fecha_vencimiento">Vencimiento</label><input id="fecha_vencimiento" name="fecha_vencimiento" type="date"><div class="error" data-error="fecha_vencimiento"></div></div>
+      <div><label for="categoriaId">Categoría</label><select id="categoriaId" name="categoriaId"></select><div class="error" data-error="categoriaId"></div></div>
+    </div>
+    <button class="btn" type="submit">Guardar</button>
+    <button class="btn sec" type="button" id="cancelar">Cancelar</button>
+  </form>
+  <label for="buscar">Buscar</label>
+  <input id="buscar" placeholder="Nombre, laboratorio o categoría" style="margin-bottom:1rem">
+  <div class="wrap"><table>
+    <thead><tr><th>ID</th><th>Nombre</th><th>Laboratorio</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Vence</th><th id="thAcc">Acciones</th></tr></thead>
+    <tbody id="filas"></tbody>
+  </table></div>
+</main>
+<script src="/js/app.js"></script>
+<script>
+const u = requireAuth(); renderNavbar();
+const puedeEditar = ['administrador', 'moderador'].includes(u.rol);
+const puedeEliminar = u.rol === 'administrador';
+const form = document.getElementById('form');
+let items = [];
+
+if (puedeEditar) form.hidden = false; else document.getElementById('thAcc').remove();
+
+async function cargar() {
+  try {
+    items = await api('/medicamentos');
+    if (puedeEditar) {
+      const cats = await api('/categorias');
+      form.categoriaId.innerHTML = '<option value="">Selecciona…</option>' +
+        cats.map((c) => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+    }
+    render();
+  } catch (e) { showAlert(e.message); }
+}
+function render() {
+  const q = document.getElementById('buscar').value.toLowerCase();
+  const lista = items.filter((m) => (m.nombre + m.laboratorio + (m.categoria?.nombre || '')).toLowerCase().includes(q));
+  document.getElementById('filas').innerHTML = lista.map((m) => `<tr>
+    <td>${m.id}</td><td>${esc(m.nombre)}</td><td>${esc(m.laboratorio)}</td><td>${esc(m.categoria?.nombre)}</td>
+    <td>S/ ${Number(m.precio).toFixed(2)}</td><td>${m.stock}</td><td>${esc(m.fecha_vencimiento)}</td>
+    ${puedeEditar ? `<td><button class="btn sm sec" data-edit="${m.id}">Editar</button>
+      ${puedeEliminar ? `<button class="btn sm del" data-del="${m.id}">Eliminar</button>` : ''}</td>` : ''}</tr>`).join('')
+    || `<tr><td colspan="8">No hay medicamentos para mostrar.</td></tr>`;
+}
+document.getElementById('buscar').addEventListener('input', render);
+function limpiar() { form.reset(); form.id.value = ''; clearErrors(form); document.getElementById('formTitulo').textContent = 'Nuevo medicamento'; }
+document.getElementById('cancelar').addEventListener('click', limpiar);
+
+document.getElementById('filas').addEventListener('click', async (e) => {
+  const edit = e.target.dataset.edit, del = e.target.dataset.del;
+  if (edit) {
+    const m = items.find((x) => x.id == edit);
+    form.id.value = m.id; form.nombre.value = m.nombre; form.laboratorio.value = m.laboratorio;
+    form.precio.value = m.precio; form.stock.value = m.stock;
+    form.fecha_vencimiento.value = m.fecha_vencimiento; form.categoriaId.value = m.categoriaId;
+    document.getElementById('formTitulo').textContent = 'Editar medicamento';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  if (del && confirm('¿Eliminar este medicamento?')) {
+    try { await api('/medicamentos/' + del, { method: 'DELETE' }); showAlert('Medicamento eliminado', 'ok'); cargar(); }
+    catch (err) { showAlert(err.message); }
+  }
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault(); clearErrors(form);
+  const nombre = form.nombre.value.trim(), laboratorio = form.laboratorio.value.trim();
+  const precio = form.precio.value, stock = form.stock.value;
+  const fecha = form.fecha_vencimiento.value, categoriaId = form.categoriaId.value;
+  let ok = true;
+  if (nombre.length < 2) { fieldError(form, 'nombre', 'Ingresa el nombre'); ok = false; }
+  if (!laboratorio) { fieldError(form, 'laboratorio', 'Ingresa el laboratorio'); ok = false; }
+  if (precio === '' || Number(precio) < 0) { fieldError(form, 'precio', 'Precio válido (0 o más)'); ok = false; }
+  if (!/^\d+$/.test(stock)) { fieldError(form, 'stock', 'Stock entero (0 o más)'); ok = false; }
+  if (!fecha) { fieldError(form, 'fecha_vencimiento', 'Selecciona la fecha'); ok = false; }
+  if (!categoriaId) { fieldError(form, 'categoriaId', 'Selecciona una categoría'); ok = false; }
+  if (!ok) return;
+  const id = form.id.value;
+  const body = { nombre, laboratorio, precio: Number(precio), stock: Number(stock), fecha_vencimiento: fecha, categoriaId: Number(categoriaId) };
+  try {
+    await api(id ? '/medicamentos/' + id : '/medicamentos', { method: id ? 'PUT' : 'POST', body });
+    showAlert(id ? 'Medicamento actualizado' : 'Medicamento creado', 'ok');
+    limpiar(); cargar();
+  } catch (err) { showAlert(err.message); }
+});
+cargar();
+</script>
+</body></html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Registro · Farmacia</title><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<main class="auth card">
+  <h1>Crear cuenta</h1>
+  <p>Selecciona el rol con el que ingresarás. Cada rol muestra opciones y permisos diferentes.</p>
+  <div id="alert" class="alert"></div>
+  <form id="form" novalidate>
+    <label for="nombre">Nombre completo</label>
+    <input id="nombre" name="nombre" autocomplete="name">
+    <div class="error" data-error="nombre"></div>
+    <label for="email">Correo electrónico</label>
+    <input id="email" name="email" type="email" autocomplete="username">
+    <div class="error" data-error="email"></div>
+    <label for="rol">Rol</label>
+    <select id="rol" name="rol" required>
+      <option value="">Selecciona un rol…</option>
+      <option value="administrador">Administrador</option>
+      <option value="moderador">Moderador</option>
+      <option value="usuario">Usuario</option>
+    </select>
+    <div class="error" data-error="rol"></div>
+    <label for="password">Contraseña (mínimo 8, con letras y números)</label>
+    <input id="password" name="password" type="password" autocomplete="new-password">
+    <div class="error" data-error="password"></div>
+    <label for="password2">Repite la contraseña</label>
+    <input id="password2" name="password2" type="password" autocomplete="new-password">
+    <div class="error" data-error="password2"></div>
+    <button class="btn" type="submit">Registrarme</button>
+  </form>
+  <p>¿Ya tienes cuenta? <a href="/index.html">Inicia sesión</a></p>
+</main>
+<script src="/js/app.js"></script>
+<script>
+const form = document.getElementById('form');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault(); clearErrors(form);
+  const nombre = form.nombre.value.trim(), email = form.email.value.trim();
+  const rol = form.rol.value;
+  const password = form.password.value, password2 = form.password2.value;
+  let ok = true;
+  if (nombre.length < 3) { fieldError(form, 'nombre', 'El nombre debe tener al menos 3 caracteres'); ok = false; }
+  if (!EMAIL_RE.test(email)) { fieldError(form, 'email', 'Ingresa un correo válido'); ok = false; }
+  if (!['administrador', 'moderador', 'usuario'].includes(rol)) { fieldError(form, 'rol', 'Selecciona un rol válido'); ok = false; }
+  if (!PASS_RE.test(password)) { fieldError(form, 'password', 'Mínimo 8 caracteres, con letras y números'); ok = false; }
+  if (password !== password2) { fieldError(form, 'password2', 'Las contraseñas no coinciden'); ok = false; }
+  if (!ok) return;
+  try {
+    await api('/auth/register', { method: 'POST', body: { nombre, email, password, rol } });
+    showAlert(`Cuenta creada como ${rol}. Inicia sesión para ver las opciones de ese rol.`, 'ok');
+    setTimeout(() => (location.href = '/index.html'), 1200);
+  } catch (err) { showAlert(err.message); }
+});
+</script>
+</body></html>

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Menú principal · Farmacia</title><link rel="stylesheet" href="/css/styles.css"></head>
+<body>
+<nav id="navbar"></nav>
+<main>
+  <h1 id="saludo">Menú principal</h1>
+  <p id="descRol"></p>
+  <div class="menu" id="opciones"></div>
+</main>
+<script src="/js/app.js"></script>
+<script>
+const u = requireAuth(); renderNavbar();
+const desc = {
+  administrador: 'Tienes control total: medicamentos, categorías y usuarios.',
+  moderador: 'Puedes crear y editar medicamentos y categorías.',
+  usuario: 'Puedes consultar el catálogo de medicamentos.',
+};
+document.getElementById('saludo').textContent = 'Hola, ' + u.nombre;
+document.getElementById('descRol').textContent = desc[u.rol];
+const cards = [
+  { href: '/medicamentos.html', t: 'Medicamentos', d: 'Catálogo, precios y stock', roles: TODOS },
+  { href: '/categorias.html', t: 'Categorías', d: 'Agrupa los medicamentos', roles: ['administrador', 'moderador'] },
+  { href: '/usuarios.html', t: 'Usuarios', d: 'Gestiona roles y cuentas', roles: ['administrador'] },
+];
+document.getElementById('opciones').innerHTML = cards.filter((c) => c.roles.includes(u.rol))
+  .map((c) => `<a href="${c.href}"><strong>${c.t}</strong>${c.d}</a>`).join('');
+</script>
+</body></html>
